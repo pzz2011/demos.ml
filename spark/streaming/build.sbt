@@ -1,9 +1,7 @@
 val globalSettings = Seq(
   version := "1.0",
-  scalaVersion := sys.env("SCALA_VERSION") 
+  scalaVersion := "2.11.8" 
 )
-
-//addSbtPlugin("com.eed3si9n" % "sbt-assembly" % sys.env("SBT_ASSEMBLY_PLUGIN_VERSION"))
 
 resolvers += "Spark Packages Repo" at "http://dl.bintray.com/spark-packages/maven"
 resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
@@ -14,40 +12,23 @@ lazy val streaming = (project in file("."))
                        .settings(globalSettings:_*)
                        .settings(libraryDependencies ++= streamingDeps)
 
-val akkaVersion = sys.env("AKKA_VERSION") 
-val sparkVersion = sys.env("SPARK_VERSION")
-val sparkCassandraConnectorVersion = sys.env("SPARK_CASSANDRA_CONNECTOR_VERSION") 
-val sparkElasticSearchConnectorVersion = sys.env("SPARK_ELASTICSEARCH_CONNECTOR_VERSION") 
-val scalaTestVersion = sys.env("SCALATEST_VERSION") 
-val jedisVersion = sys.env("JEDIS_VERSION") 
-val sparkCsvVersion = sys.env("SPARK_CSV_CONNECTOR_VERSION") 
-val sparkAvroVersion = sys.env("SPARK_AVRO_CONNECTOR_VERSION") 
-val algebirdVersion = sys.env("ALGEBIRD_VERSION") 
-val sparkNifiConnectorVersion = sys.env("SPARK_NIFI_CONNECTOR_VERSION")
-val indexedRddVersion = sys.env("INDEXEDRDD_VERSION")
-val ankurPartVersion = sys.env("ANKUR_PART_VERSION")
-// We can't promote this over version 2.5.0 otherwise it conflicts with Spark 1.6 version of Jackson
-val maxmindGeoIpVersion = sys.env("MAXMIND_GEOIP_VERSION")
-val dynoVersion = sys.env("DYNO_VERSION")
-val jblasVersion = sys.env("JBLAS_VERSION")
+val sparkVersion = "2.0.1" 
 
 lazy val streamingDeps = Seq(
-  "org.jblas"            % "jblas"                 % jblasVersion,
-  "com.madhukaraphatak" %% "java-sizeof" % "0.1",
-  "com.datastax.spark"  %% "spark-cassandra-connector" % sparkCassandraConnectorVersion % "provided",
-  "org.elasticsearch"   %% "elasticsearch-spark" % sparkElasticSearchConnectorVersion % "provided",
-  "redis.clients"       % "jedis" % jedisVersion % "provided",
-  "com.databricks"      %% "spark-csv" % sparkCsvVersion % "provided",
-  "com.databricks"      %% "spark-avro" % sparkAvroVersion % "provided",
-  "com.twitter"         %% "algebird-core" % algebirdVersion % "provided",
-  "org.apache.spark"    %% "spark-mllib"           % sparkVersion % "provided",
-  "org.apache.spark"    %% "spark-graphx"          % sparkVersion % "provided",
-  "org.apache.spark"    %% "spark-sql"             % sparkVersion % "provided",
-  "org.apache.spark"    %% "spark-streaming"       % sparkVersion % "provided",
-  "org.apache.spark"    %% "spark-streaming-kafka" % sparkVersion % "provided",
-  "amplab"              % "spark-indexedrdd" % indexedRddVersion % "provided",
-  "com.ankurdave"       %% "part" % ankurPartVersion % "provided",
-  "org.apache.nifi"     % "nifi-spark-receiver" % sparkNifiConnectorVersion % "provided",
-  "com.maxmind.geoip2"  % "geoip2"		% maxmindGeoIpVersion % "provided",
-  "com.netflix.dyno"     % "dyno-jedis"                    % dynoVersion
+  "org.jblas"            % "jblas"                 	% "1.2.4",
+  "com.madhukaraphatak" %% "java-sizeof" 		% "0.1",
+  "com.datastax.spark"  %% "spark-cassandra-connector" 	% "1.4.0"	% "provided",
+  "org.elasticsearch"   %% "elasticsearch-spark" 	% "2.3.0" 	% "provided",
+  "redis.clients"        % "jedis" 			% "2.7.3" 	% "provided",
+  "com.databricks"      %% "spark-avro" 		% "2.0.1" 	% "provided",
+  "com.twitter"         %% "algebird-core" 		% "0.11.0"	% "provided",
+  "org.apache.spark"    %% "spark-mllib"           	% sparkVersion 	% "provided",
+  "org.apache.spark"    %% "spark-graphx"          	% sparkVersion 	% "provided",
+  "org.apache.spark"    %% "spark-sql"             	% sparkVersion 	% "provided",
+  "org.apache.spark"    %% "spark-streaming"       	% sparkVersion 	% "provided",
+  "org.apache.spark"    %% "spark-streaming-kafka" 	% sparkVersion 	% "provided",
+  "amplab"               % "spark-indexedrdd" 		% "0.3"		% "provided",
+  "com.ankurdave"       %% "part" 			% "0.1"		% "provided",
+// We can't promote this over version 2.5.0 otherwise it conflicts with Spark 1.6 version of Jackson
+  "com.maxmind.geoip2"   % "geoip2"			% "2.5.0" 	% "provided"
 )
