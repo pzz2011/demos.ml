@@ -1,6 +1,5 @@
 package com.advancedspark.streaming.rating.ml.incremental
 
-import org.apache.spark.streaming.kafka.KafkaUtils
 import org.apache.spark.streaming.Seconds
 import org.apache.spark.streaming.StreamingContext
 import org.apache.spark.SparkContext
@@ -25,41 +24,57 @@ import java.util.List
 
 import org.jblas.DoubleMatrix
 
-import com.netflix.dyno.jedis._
-import com.netflix.dyno.connectionpool.Host
-import com.netflix.dyno.connectionpool.HostSupplier
-import com.netflix.dyno.connectionpool.TokenMapSupplier
-import com.netflix.dyno.connectionpool.impl.lb.HostToken
-import com.netflix.dyno.connectionpool.exception.DynoException
-import com.netflix.dyno.connectionpool.impl.ConnectionPoolConfigurationImpl
-import com.netflix.dyno.connectionpool.impl.ConnectionContextImpl
-import com.netflix.dyno.connectionpool.impl.OperationResultImpl
-import com.netflix.dyno.connectionpool.impl.utils.ZipUtils
+import org.apache.spark.streaming.kafka010._
+import org.apache.spark.streaming.kafka010.LocationStrategies.PreferConsistent
+import org.apache.spark.streaming.kafka010.ConsumerStrategies.Subscribe
+import org.apache.spark.streaming.Seconds
+import org.apache.spark.TaskContext
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.streaming.StreamingContext
+import org.apache.spark.SparkContext
+import org.apache.spark.sql.SQLContext
+import org.apache.spark.SparkConf
+import kafka.serializer.StringDecoder
+import org.apache.spark.sql.SaveMode
+import org.apache.spark.sql.Row
+import org.apache.spark.rdd.RDD
+import org.apache.spark.streaming.Time
+import org.apache.spark.streaming.Minutes
+import org.apache.spark.sql._
+import org.apache.spark.sql.types._
+
+import redis.clients.jedis.Jedis
+import redis.clients.jedis.Transaction
 
 object TrainMFIncremental {
   def main(args: Array[String]) {
-    val conf = new SparkConf()
-
-    val sc = SparkContext.getOrCreate(conf)
+   val conf = new SparkConf()
+    val session = SparkSession.builder().getOrCreate(conf)
 
     def createStreamingContext(): StreamingContext = {
-      @transient val newSsc = new StreamingContext(sc, Seconds(20))
+      @transient val newSsc = new StreamingContext(session.sparkContext, Seconds(2))
       println(s"Creating new StreamingContext $newSsc")
 
       newSsc
     }
     val ssc = StreamingContext.getActiveOrCreate(createStreamingContext)
 
-    val sqlContext = SQLContext.getOrCreate(sc)
-    import sqlContext.implicits._
+    // Kafka Config
+    val kafkaParams = Map[String, Object](
+      "bootstrap.servers" -> "demo.pipeline.io:9092",
+      "key.deserializer" -> classOf[StringDeserializer],
+      "value.deserializer" -> classOf[StringDeserializer],
+      "group.id" -> "example",
+      "auto.offset.reset" -> "latest",
+      "enable.auto.commit" -> (false: java.lang.Boolean)
+    )
 
-    val brokers = "127.0.0.1:9092"
     val topics = Set("item_ratings")
 
-    val kafkaParams = Map[String, String]("metadata.broker.list" -> brokers, 
-                                          "auto.offset.reset" -> "smallest")
-
-    val trainingStream = KafkaUtils.createDirectStream[String, String, StringDecoder, StringDecoder](ssc, kafkaParams, topics)
+    // Create Kafka Direct Stream Receiver
+    val trainingStream = KafkaUtils.createDirectStream[String, String](
+      ssc, PreferConsistent, Subscribe[String, String](topics, kafkaParams)
+    )
 
     val rank = 5 // suggested number of latent factors
     val maxIterations = 5 // static number of iterations
@@ -107,12 +122,15 @@ object TrainMFIncremental {
             .train(ratingsBatchRDD, newModel, numObservations)
             .asInstanceOf[StreamingLatentMatrixFactorizationModel]
 
+          val jedis = new Jedis("redis.datasticks.com", 6379)
+
           // Update Redis in real-time with userFactors and itemFactors
           val userFactors = model.userFactors.filter(_._1 != 0).collect()
           userFactors.foreach(factor => {
             val userId = factor._1
             val factors = factor._2.vector
-            DynomiteOps.dynoClient.set(s"::user-factors:${userId}", factors.mkString(","))
+            jedis.set(s"::user-factors:${userId}", factors.mkString(","))
+            
             System.out.println(s"Updated key '::user-factors:${userId}' : ${factors.mkString(",")}")
           })
 
@@ -120,8 +138,9 @@ object TrainMFIncremental {
           itemFactors.foreach(factor => {
             val itemId = factor._1
             val factors = factor._2.vector
-            DynomiteOps.dynoClient.set(s"::item-factors:${itemId}", factors.mkString(","))
-            System.out.println(s"Updated key '::item-factors:${itemId}' : ${factors.mkString(",")}")
+            jedis.set(s"::item-factors:${itemId}", factors.mkString(","))
+
+            System.out.println(s"TODO: Updated key '::item-factors:${itemId}' : ${factors.mkString(",")}")
           })
 
           // For every (userId, itemId) tuple, calculate prediction
@@ -134,7 +153,7 @@ object TrainMFIncremental {
             } yield (userFactor._1, itemFactor._1, prediction)
 
           allUserItemPredictions.foreach{ case (userId, itemId, prediction) => 
-            DynomiteOps.dynoClient.zadd(s"::recommendations:${userId}", prediction, itemId.toString)
+            jedis.zadd(s"::recommendations:${userId}", prediction, itemId.toString)
           }
 
           System.out.println(s"Updated user-to-item recommendations key '::recommendations:<userId>'")
@@ -152,8 +171,10 @@ object TrainMFIncremental {
             }  yield (givenItemFactor._1, similarItemFactor._1, similarity)
  
           allItemSimilars.foreach{ case (givenItemId, similarItemId, similarity) =>
-            DynomiteOps.dynoClient.zadd(s"::item-similars:${givenItemId}", similarity, similarItemId.toString)
+            jedis.zadd(s"::item-similars:${givenItemId}", similarity, similarItemId.toString)
           }
+
+	  jedis.close()
 
           System.out.println(s"Updated item-to-item similarities key '::item-similars:<itemId>'")
               
@@ -165,38 +186,4 @@ object TrainMFIncremental {
     ssc.start()
     ssc.awaitTermination()
   }
-}
-
-object DynomiteOps {
-  val localhostHost = new Host("127.0.0.1", Host.Status.Up)
-  val localhostToken = new HostToken(100000L, localhostHost)
-
-  val localhostHostSupplier = new HostSupplier() {
-    @Override
-    def getHosts(): Collection[Host] = {
-      Collections.singletonList(localhostHost)
-    }
-  }
-
-  val localhostTokenMapSupplier = new TokenMapSupplier() {
-    @Override
-    def getTokens(activeHosts: java.util.Set[Host]): List[HostToken] = {
-      Collections.singletonList(localhostToken)
-    }
-
-    @Override
-    def getTokenForHost(host: Host, activeHosts: java.util.Set[Host]): HostToken = {
-      return localhostToken
-    }
-  }
-
-  val redisPort = 6379
-  val dynoClient = new DynoJedisClient.Builder()
-             .withApplicationName("pipeline")
-             .withDynomiteClusterName("pipeline-dynomite")
-             .withHostSupplier(localhostHostSupplier)
-             .withCPConfig(new ConnectionPoolConfigurationImpl("localhostTokenMapSupplier")
-                .withTokenSupplier(localhostTokenMapSupplier))
-             .withPort(redisPort)
-             .build()
 }

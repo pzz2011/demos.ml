@@ -1,7 +1,11 @@
 package com.advancedspark.streaming.rating.approx
 
-import org.apache.spark.streaming.kafka.KafkaUtils
+import org.apache.spark.streaming.kafka010._
+import org.apache.spark.streaming.kafka010.LocationStrategies.PreferConsistent
+import org.apache.spark.streaming.kafka010.ConsumerStrategies.Subscribe
 import org.apache.spark.streaming.Seconds
+import org.apache.spark.TaskContext
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.streaming.StreamingContext
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.SQLContext
@@ -23,32 +27,37 @@ import com.madhukaraphatak.sizeof.SizeEstimator
 object AlgebirdCountMinSketchTopK {
   def main(args: Array[String]) {
     val conf = new SparkConf()
-    
-    val sc = SparkContext.getOrCreate(conf)
+    val session = SparkSession.builder().getOrCreate(conf)
 
     def createStreamingContext(): StreamingContext = {
-      @transient val newSsc = new StreamingContext(sc, Seconds(2))
+      @transient val newSsc = new StreamingContext(session.sparkContext, Seconds(2))
       println(s"Creating new StreamingContext $newSsc")
       newSsc.remember(Minutes(10))
       newSsc
     }
     val ssc = StreamingContext.getActiveOrCreate(createStreamingContext)
 
-    val sqlContext = SQLContext.getOrCreate(sc)
-    import sqlContext.implicits._
-
     // Kafka Config
-    val brokers = "127.0.0.1:9092"
-    val kafkaParams = Map[String, String]("metadata.broker.list" -> brokers)
+    val kafkaParams = Map[String, Object](
+      "bootstrap.servers" -> "demo.pipeline.io:9092",
+      "key.deserializer" -> classOf[StringDeserializer],
+      "value.deserializer" -> classOf[StringDeserializer],
+      "group.id" -> "example",
+      "auto.offset.reset" -> "latest",
+      "enable.auto.commit" -> (false: java.lang.Boolean)
+    )
+
     val topics = Set("item_ratings")
 
-    val htmlHome = sys.env("HTML_HOME")
-
-    val itemsDF = sqlContext.read.format("json")
+    val htmlHome = sys.env("GITHUB_REPO_NAME")
+ 
+    val itemsDF = session.sqlContext.read.format("json")
       .load(s"""file:${htmlHome}/advancedspark.com/json/actors.json""")
 
     // Create Kafka Direct Stream Receiver
-    val ratingsStream = KafkaUtils.createDirectStream[String, String, StringDecoder, StringDecoder](ssc, kafkaParams, topics)
+    val ratingsStream = KafkaUtils.createDirectStream[String, String](
+      ssc, PreferConsistent, Subscribe[String, String](topics, kafkaParams)
+    )
 
     // Setup the Algebird CountMin Sketch data struct
     val eps = 0.001

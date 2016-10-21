@@ -26,9 +26,9 @@ lazy val streamingDeps = Seq(
   "org.apache.spark"    %% "spark-graphx"          	% sparkVersion 	% "provided",
   "org.apache.spark"    %% "spark-sql"             	% sparkVersion 	% "provided",
   "org.apache.spark"    %% "spark-streaming"       	% sparkVersion 	% "provided",
-  "org.apache.spark"    %% "spark-streaming-kafka" 	% sparkVersion 	% "provided",
+  "org.apache.spark"    %% "spark-streaming-kafka-0-10"	% sparkVersion 	% "provided",
   "amplab"               % "spark-indexedrdd" 		% "0.3"		% "provided",
-  "com.ankurdave"       %% "part" 			% "0.1"		% "provided",
+  "com.ankurdave"        % "part_2.10" 			% "0.1"		% "provided",
 // We can't promote this over version 2.5.0 otherwise it conflicts with Spark 1.6 version of Jackson
   "com.maxmind.geoip2"   % "geoip2"			% "2.5.0" 	% "provided"
 )

@@ -1,6 +1,5 @@
 package com.advancedspark.streaming.rating.store
 
-import org.apache.spark.streaming.kafka.KafkaUtils
 import org.apache.spark.streaming.Seconds
 import org.apache.spark.streaming.StreamingContext
 import org.apache.spark.SparkContext
@@ -15,28 +14,55 @@ import redis.clients.jedis.Jedis
 import redis.clients.jedis.Transaction
 import com.advancedspark.streaming.rating.core.RatingGeo
 
+import org.apache.spark.streaming.kafka010._
+import org.apache.spark.streaming.kafka010.LocationStrategies.PreferConsistent
+import org.apache.spark.streaming.kafka010.ConsumerStrategies.Subscribe
+import org.apache.spark.streaming.Seconds
+import org.apache.spark.TaskContext
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.streaming.StreamingContext
+import org.apache.spark.SparkContext
+import org.apache.spark.sql.SQLContext
+import org.apache.spark.SparkConf
+import kafka.serializer.StringDecoder
+import org.apache.spark.sql.SaveMode
+import org.apache.spark.sql.Row
+import org.apache.spark.rdd.RDD
+import org.apache.spark.streaming.Time
+import org.apache.spark.streaming.Minutes
+import org.apache.spark.sql._
+import org.apache.spark.sql.types._
+
 object Redis {
   def main(args: Array[String]) {
-    val conf = new SparkConf()
 
-    val sc = SparkContext.getOrCreate(conf)
+    val conf = new SparkConf()
+    val session = SparkSession.builder().getOrCreate(conf)
 
     def createStreamingContext(): StreamingContext = {
-      @transient val newSsc = new StreamingContext(sc, Seconds(2))
+      @transient val newSsc = new StreamingContext(session.sparkContext, Seconds(2))
       println(s"Creating new StreamingContext $newSsc")
 
       newSsc
     }
     val ssc = StreamingContext.getActiveOrCreate(createStreamingContext)
 
-    val sqlContext = SQLContext.getOrCreate(sc)
-    import sqlContext.implicits._
+    // Kafka Config
+    val kafkaParams = Map[String, Object](
+      "bootstrap.servers" -> "demo.pipeline.io:9092",
+      "key.deserializer" -> classOf[StringDeserializer],
+      "value.deserializer" -> classOf[StringDeserializer],
+      "group.id" -> "example",
+      "auto.offset.reset" -> "latest",
+      "enable.auto.commit" -> (false: java.lang.Boolean)
+    )
 
-    val brokers = "127.0.0.1:9092"
     val topics = Set("item_ratings")
-    val kafkaParams = Map[String, String]("metadata.broker.list" -> brokers)
-   
-    val ratingsStream = KafkaUtils.createDirectStream[String, String, StringDecoder, StringDecoder](ssc, kafkaParams, topics)
+
+    // Create Kafka Direct Stream Receiver
+    val ratingsStream = KafkaUtils.createDirectStream[String, String](
+      ssc, PreferConsistent, Subscribe[String, String](topics, kafkaParams)
+    )
 
     ratingsStream.foreachRDD {
       (message: RDD[(String, String)], batchTime: Time) => {
@@ -56,7 +82,7 @@ object Redis {
           //        1) This obviously only works when everything is running on 1 node.
           //        2) This should be using a Jedis Singleton/Pooled connection
           //        3) Explore the spark-redis package (RedisLabs:spark-redis:0.1.0+)
-          val jedis = new Jedis("127.0.0.1", 6379)
+          val jedis = new Jedis("redis.datasticks.com", 6379)
           val t = jedis.multi()
           ratingsPartitionIter.foreach(rating => {
             val keyExactRatingCount = s"""exact-rating-count:${rating.itemId}"""
