@@ -4,3 +4,4 @@ org.eclipse.core.resources.prefs
 .project
 .settings
 .classpath
+.DS_Store

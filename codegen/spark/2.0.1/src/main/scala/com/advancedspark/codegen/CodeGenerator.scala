@@ -125,11 +125,6 @@ class CodeGenContext {
   def declareAddedFunctions(): String = {
     addedFunctions.map { case (funcName, funcCode) => funcCode }.mkString("\n")
   }
-
-  /**
-   * The map from a place holder to a corresponding comment
-   */
-  private val placeHolderToComments = new mutable.HashMap[String, String]
   
   /**
    * The map from a variable name to it's next ID.
@@ -315,50 +310,25 @@ class CodeGenContext {
       functions.map(name => s"$name($row);").mkString("\n")
     }
   }  
-
-  /**
-   * get a map of the pair of a place holder and a corresponding comment
-   */
-  def getPlaceHolderToComments(): collection.Map[String, String] = placeHolderToComments
-
-  /**
-   * Register a comment and return the corresponding place holder
-   */
-  def registerComment(text: => String): String = {
-    // TODO:  By default, disable comments in generated code because computing the comments themselves can
-    // be extremely expensive in certain cases, such as deeply-nested expressions which operate over
-    // inputs with wide schemas. For more details on the performance issues that motivated this
-    // flat, see SPARK-15680.
-    val name = freshName("c")
-    val comment = if (text.contains("\n") || text.contains("\r")) {
-      text.split("(\r\n)|\r|\n").mkString("/**\n * ", "\n * ", "\n */")
-    } else {
-      s"// $text"
-    }
-    placeHolderToComments += (name -> comment)
-    s"/*$name*/"
-  }
 }
 
 /**
  * A wrapper for the source code to be compiled by [[CodeGenerator]].
  */
-class CodeGenBundle(val packageName: String, 
-                    val className: String, 
+class CodeGenBundle(val className: String,  
                     val extend: Class[_],
                     val interfaces: Array[Class[_]],                  
                     val imports: Array[Class[_]],                    
-                    val body: String, 
-                    val comment: collection.Map[String, String])
+                    val body: String)
     extends Serializable {
 
   // TODO:  Make equals() and hashCode() more robust - used by Google Cache
   override def equals(that: Any): Boolean = that match {
-    case t: CodeGenBundle if (t.packageName == packageName && t.className == className && t.body == body) => true
+    case t: CodeGenBundle if (t.className == className && t.body == body) => true
     case _ => false
   }
 
-  override def hashCode(): Int = (packageName + className + body).hashCode
+  override def hashCode(): Int = (className + body).hashCode
 }
 
 object CodeGenerator {
@@ -376,16 +346,11 @@ object CodeGenerator {
   private[this] def doCompile(codeGenBundle: CodeGenBundle): Class[_] = {
     val evaluator = new ClassBodyEvaluator()
 
-    val fullyQualifiedClassName = codeGenBundle.packageName + "." + codeGenBundle.className
-    
-    evaluator.setClassName(fullyQualifiedClassName)
+    evaluator.setClassName(codeGenBundle.className)
     evaluator.setDefaultImports(codeGenBundle.imports.map(_.getName))
     evaluator.setImplementedInterfaces(codeGenBundle.interfaces) 
     
-    val parentClassLoader = //new ParentClassLoader(new CodeGenClassLoader().getContextOrAppClassLoader)
-      evaluator.setParentClassLoader(getClass.getClassLoader)
-      //evaluator.setParentClassLoader(getClass.getClassLoader.getParent.getParent)
-      //evaluator.setParentClassLoader(getClass.getSystemClassLoader())
+    val parentClassLoader = evaluator.setParentClassLoader(getClass.getClassLoader)
     
     lazy val formatted = CodeFormatter.format(codeGenBundle)
 

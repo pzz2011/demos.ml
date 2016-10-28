@@ -1,9 +1,6 @@
 package com.advancedspark.codegen
 
-import java.util.regex.Matcher
 import com.codahale.metrics.MetricRegistry
-import scala.util.Try
-import scala.reflect.io.File
 
 trait Source {
   def sourceName: String
@@ -57,10 +54,7 @@ object CodeFormatter {
   def format(codeGenBundle: CodeGenBundle): String = {
     val formatter = new CodeFormatter
     codeGenBundle.body.split("\n").foreach { line =>
-      val commentReplaced = commentHolder.replaceAllIn(
-        line.trim,
-        m => codeGenBundle.comment.get(m.group(1)).map(Matcher.quoteReplacement).getOrElse(m.group(0)))
-      formatter.addLine(commentReplaced)
+      formatter.addLine(line.trim)
     }
     formatter.result()
   }
@@ -78,37 +72,6 @@ object CodeFormatter {
       lastLine = line
     }
     code.result()
-  }
-
-  def stripOverlappingComments(codeGenBundle: CodeGenBundle): CodeGenBundle = {
-    val code = new StringBuilder
-    val comments = codeGenBundle.comment
-
-    def getComment(line: String): Option[String] = {
-      if (line.startsWith("/*") && line.endsWith("*/")) {
-        comments.get(line.substring(2, line.length - 2))
-      } else {
-        None
-      }
-    }
-
-    var lastLine: String = "dummy"
-    codeGenBundle.body.split('\n').foreach { l =>
-      val line = l.trim()
-
-      val skip = getComment(lastLine).zip(getComment(line)).exists {
-        case (lastComment, currentComment) =>
-          lastComment.substring(3).contains(currentComment.substring(3))
-      }
-
-      if (!skip) {
-        code.append(line).append("\n")
-      }
-
-      lastLine = line
-    }
-    
-    new CodeGenBundle(codeGenBundle.packageName, codeGenBundle.className, codeGenBundle.extend, codeGenBundle.interfaces, codeGenBundle.imports, code.result().trim(), comments)
   }
 }
 

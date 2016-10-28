@@ -28,8 +28,6 @@ object TreeClassifierMain {
        
     // TODO:  Disable comments and line numbers as they're expensive
     val source = s"""
-      ${ctx.registerComment("LookupMap Comment...")}
-    
       ${ctx.declareMutableStates()}
 
       public void initialize(Object[] references) {
@@ -43,14 +41,13 @@ object TreeClassifierMain {
     // Note:  If you see "InstantiationException", you might be trying to create a package+classname that already exists.
     //        This is why we're namespacing this package to include ".generated", but we also changed the name of this
       //        outer class to LookupMapMain to make this more explicit.
-    val cleanedSource = CodeFormatter.stripOverlappingComments(        
-      new CodeGenBundle("com.advancedspark.codegen.example.generated", "LookupMap", 
+    val cleanedSource =         
+      new CodeGenBundle("com.advancedspark.codegen.example.generated.LookupMap", 
           null, 
           Array(classOf[Initializable], classOf[Lookupable], classOf[Serializable]), 
           Array(classOf[java.util.HashMap[Any, Any]]), 
-          CodeFormatter.stripExtraNewLines(source), 
-          ctx.getPlaceHolderToComments())
-    )
+          CodeFormatter.stripExtraNewLines(source)
+      )
 
     try {
       val clazz = CodeGenerator.compile(cleanedSource)

@@ -19,7 +19,6 @@ import org.apache.spark.streaming.dstream.ConstantInputDStream
 
 import scala.collection.JavaConversions._
 import java.util.Collections
-import java.util.Collection
 import java.util.List
 
 import org.jblas.DoubleMatrix
@@ -43,13 +42,14 @@ import org.apache.spark.streaming.Minutes
 import org.apache.spark.sql._
 import org.apache.spark.sql.types._
 
-import redis.clients.jedis.Jedis
-import redis.clients.jedis.Transaction
+import redis.clients.jedis._
+
+import org.apache.kafka.common.serialization.StringDeserializer
 
 object TrainMFIncremental {
   def main(args: Array[String]) {
    val conf = new SparkConf()
-    val session = SparkSession.builder().getOrCreate(conf)
+    val session = SparkSession.builder().config(conf).getOrCreate()
 
     def createStreamingContext(): StreamingContext = {
       @transient val newSsc = new StreamingContext(session.sparkContext, Seconds(2))
@@ -90,7 +90,7 @@ object TrainMFIncremental {
     val matrixFactorization = new LatentMatrixFactorization(params)
 
     // TODO:  Fix these hacks to work around the issue of not having an initialModel
-    val initialRatingRDD = sc.parallelize(Rating(0L, 0L, 0L) :: Nil)
+    val initialRatingRDD = session.sparkContext.parallelize(Rating(0L, 0L, 0L) :: Nil)
     val initialModel = None
 
     // Internally, this setups up additional transformations on the incoming stream
@@ -100,12 +100,14 @@ object TrainMFIncremental {
 
     // Setup the initial transformations from String -> ALS.Rating
     val ratingTrainingStream = trainingStream.map(message => {
-      val tokens = message._2.split(",")
+      val tokens = message.value().split(",")
 
       // convert Tokens into RDD[ALS.Rating]
       Rating(tokens(0).trim.toLong, tokens(1).trim.toLong, tokens(2).trim.toFloat)
     })
    
+    val jedisPool = new JedisPool(new JedisPoolConfig(), "redis-master", 6379);
+    
     ratingTrainingStream.foreachRDD {
       (ratingsBatchRDD: RDD[Rating[Long]], batchTime: Time) => {
       
@@ -113,68 +115,71 @@ object TrainMFIncremental {
           var (newModel, numObservations) = LatentMatrixFactorizationModelOps
             .train(ratingsBatchRDD, params, Some(model), isStreaming = true)
 
-	  // TODO:  Hide optimizer so it's not publicly available
-  	  // TODO:  Figure out why we're passing in newModel here
+      	  // TODO:  Hide optimizer so it's not publicly available
+  	      // TODO:  Figure out why we're passing in newModel here
           // TODO:  Also,  why are we returning a model here.  
-	  // TODO:  And why do we need LatentMatrixFactorizationModelOps
-	  // TODO:  Clean this all up
-	  model = matrixFactorization.optimizer
+	        // TODO:  And why do we need LatentMatrixFactorizationModelOps
+      	  // TODO:  Clean this all up
+	        model = matrixFactorization.optimizer
             .train(ratingsBatchRDD, newModel, numObservations)
             .asInstanceOf[StreamingLatentMatrixFactorizationModel]
 
-          val jedis = new Jedis("redis.datasticks.com", 6379)
-
-          // Update Redis in real-time with userFactors and itemFactors
-          val userFactors = model.userFactors.filter(_._1 != 0).collect()
-          userFactors.foreach(factor => {
-            val userId = factor._1
-            val factors = factor._2.vector
-            jedis.set(s"::user-factors:${userId}", factors.mkString(","))
-            
-            System.out.println(s"Updated key '::user-factors:${userId}' : ${factors.mkString(",")}")
-          })
-
-          val itemFactors = model.itemFactors.filter(_._1 != 0).collect()
-          itemFactors.foreach(factor => {
-            val itemId = factor._1
-            val factors = factor._2.vector
-            jedis.set(s"::item-factors:${itemId}", factors.mkString(","))
-
-            System.out.println(s"TODO: Updated key '::item-factors:${itemId}' : ${factors.mkString(",")}")
-          })
-
-          // For every (userId, itemId) tuple, calculate prediction
-          val allUserItemPredictions =
-            for { 
-              userFactor <- userFactors 
-              itemFactor <- itemFactors
-              val prediction = new DoubleMatrix(userFactor._2.vector.map(_.toDouble))
-                .dot(new DoubleMatrix(itemFactor._2.vector.map(_.toDouble)))
-            } yield (userFactor._1, itemFactor._1, prediction)
-
-          allUserItemPredictions.foreach{ case (userId, itemId, prediction) => 
-            jedis.zadd(s"::recommendations:${userId}", prediction, itemId.toString)
+          val jedis = jedisPool.getResource
+          try {           
+            // Update Redis in real-time with userFactors and itemFactors
+            val userFactors = model.userFactors.filter(_._1 != 0).collect()
+            userFactors.foreach(factor => {
+              val userId = factor._1
+              val factors = factor._2.vector
+              jedis.set(s"::user-factors:${userId}", factors.mkString(","))
+              
+              System.out.println(s"Updated key '::user-factors:${userId}' : ${factors.mkString(",")}")
+            })
+  
+            val itemFactors = model.itemFactors.filter(_._1 != 0).collect()
+            itemFactors.foreach(factor => {
+              val itemId = factor._1
+              val factors = factor._2.vector
+              jedis.set(s"::item-factors:${itemId}", factors.mkString(","))
+  
+              System.out.println(s"TODO: Updated key '::item-factors:${itemId}' : ${factors.mkString(",")}")
+            })
+  
+            // For every (userId, itemId) tuple, calculate prediction
+            val allUserItemPredictions =
+              for { 
+                userFactor <- userFactors 
+                itemFactor <- itemFactors
+                val prediction = new DoubleMatrix(userFactor._2.vector.map(_.toDouble))
+                  .dot(new DoubleMatrix(itemFactor._2.vector.map(_.toDouble)))
+              } yield (userFactor._1, itemFactor._1, prediction)
+  
+            allUserItemPredictions.foreach{ case (userId, itemId, prediction) => 
+              jedis.zadd(s"::recommendations:${userId}", prediction, itemId.toString)
+            }
+  
+            System.out.println(s"Updated user-to-item recommendations key '::recommendations:<userId>'")
+  
+            // Item-to-Item Similarity
+  	        //  ::item-similars:${itemId}
+            val allItemSimilars = 
+              for {
+                givenItemFactor <- itemFactors
+                similarItemFactor <- itemFactors
+                val givenItemFactorsMatrix = new DoubleMatrix(givenItemFactor._2.vector.map(_.toDouble))
+                val similarItemFactorsMatrix = new DoubleMatrix(similarItemFactor._2.vector.map(_.toDouble)) 
+                val similarity = Similarity.cosineSimilarity(givenItemFactorsMatrix, similarItemFactorsMatrix)
+                if (givenItemFactor._1 < similarItemFactor._1)
+              }  yield (givenItemFactor._1, similarItemFactor._1, similarity)
+   
+            allItemSimilars.foreach{ case (givenItemId, similarItemId, similarity) =>
+              jedis.zadd(s"::item-similars:${givenItemId}", similarity, similarItemId.toString)
+            }
+          } finally {
+	          if (jedis != null) {
+              jedis.close()
+	          }
           }
-
-          System.out.println(s"Updated user-to-item recommendations key '::recommendations:<userId>'")
-
-          // Item-to-Item Similarity
-	  //  ::item-similars:${itemId}
-          val allItemSimilars = 
-            for {
-              givenItemFactor <- itemFactors
-              similarItemFactor <- itemFactors
-              val givenItemFactorsMatrix = new DoubleMatrix(givenItemFactor._2.vector.map(_.toDouble))
-              val similarItemFactorsMatrix = new DoubleMatrix(similarItemFactor._2.vector.map(_.toDouble)) 
-              val similarity = Similarity.cosineSimilarity(givenItemFactorsMatrix, similarItemFactorsMatrix)
-              if (givenItemFactor._1 < similarItemFactor._1)
-            }  yield (givenItemFactor._1, similarItemFactor._1, similarity)
- 
-          allItemSimilars.foreach{ case (givenItemId, similarItemId, similarity) =>
-            jedis.zadd(s"::item-similars:${givenItemId}", similarity, similarItemId.toString)
-          }
-
-	  jedis.close()
 
           System.out.println(s"Updated item-to-item similarities key '::item-similars:<itemId>'")
               
