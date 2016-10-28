@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="src" path="experimental"/>
+	<classpathentry kind="src" path="src/main/java"/>
+	<classpathentry kind="src" path="src/main/scala"/>
+	<classpathentry kind="con" path="org.scala-ide.sdt.launching.SCALA_CONTAINER"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry kind="lib" path="/Users/cfregly/workspace-fluxcapacitor/lib-2.11/spark-catalyst_2.11-2.0.1-SNAPSHOT.jar"/>
+	<classpathentry kind="lib" path="/Users/cfregly/workspace-fluxcapacitor/lib-2.11/spark-core_2.11-2.0.1-SNAPSHOT.jar"/>
+	<classpathentry kind="lib" path="/Users/cfregly/workspace-fluxcapacitor/lib-2.11/spark-ganglia-lgpl_2.11-2.0.1-SNAPSHOT.jar"/>
+	<classpathentry kind="lib" path="/Users/cfregly/workspace-fluxcapacitor/lib-2.11/spark-graphx_2.11-2.0.1-SNAPSHOT.jar"/>
+	<classpathentry kind="lib" path="/Users/cfregly/workspace-fluxcapacitor/lib-2.11/spark-hive_2.11-2.0.1-SNAPSHOT.jar"/>
+	<classpathentry kind="lib" path="/Users/cfregly/workspace-fluxcapacitor/lib-2.11/spark-launcher_2.11-2.0.1-SNAPSHOT.jar"/>
+	<classpathentry kind="lib" path="/Users/cfregly/workspace-fluxcapacitor/lib-2.11/spark-mllib_2.11-2.0.1-SNAPSHOT.jar"/>
+	<classpathentry kind="lib" path="/Users/cfregly/workspace-fluxcapacitor/lib-2.11/spark-mllib-local_2.11-2.0.1-SNAPSHOT.jar"/>
+	<classpathentry kind="lib" path="/Users/cfregly/workspace-fluxcapacitor/lib-2.11/spark-network-common_2.11-2.0.1-SNAPSHOT.jar"/>
+	<classpathentry kind="lib" path="/Users/cfregly/workspace-fluxcapacitor/lib-2.11/spark-network-shuffle_2.11-2.0.1-SNAPSHOT.jar"/>
+	<classpathentry kind="lib" path="/Users/cfregly/workspace-fluxcapacitor/lib-2.11/spark-repl_2.11-2.0.1-SNAPSHOT.jar"/>
+	<classpathentry kind="lib" path="/Users/cfregly/workspace-fluxcapacitor/lib-2.11/spark-sketch_2.11-2.0.1-SNAPSHOT.jar"/>
+	<classpathentry kind="lib" path="/Users/cfregly/workspace-fluxcapacitor/lib-2.11/spark-sql_2.11-2.0.1-SNAPSHOT.jar"/>
+	<classpathentry kind="lib" path="/Users/cfregly/workspace-fluxcapacitor/lib-2.11/spark-streaming_2.11-2.0.1-SNAPSHOT.jar"/>
+	<classpathentry kind="lib" path="/Users/cfregly/workspace-fluxcapacitor/lib-2.11/spark-tags_2.11-2.0.1-SNAPSHOT.jar"/>
+	<classpathentry kind="lib" path="/Users/cfregly/workspace-fluxcapacitor/lib-2.11/spark-unsafe_2.11-2.0.1-SNAPSHOT.jar"/>
+	<classpathentry kind="lib" path="/Users/cfregly/workspace-fluxcapacitor/lib-2.11/janino-2.7.8.jar"/>
+	<classpathentry kind="lib" path="/Users/cfregly/workspace-fluxcapacitor/lib-2.11/guava-14.0.1.jar"/>
+	<classpathentry kind="lib" path="/Users/cfregly/workspace-fluxcapacitor/lib-2.11/metrics-core-3.1.2.jar"/>
+	<classpathentry kind="output" path="generated-classes"/>
+</classpath>

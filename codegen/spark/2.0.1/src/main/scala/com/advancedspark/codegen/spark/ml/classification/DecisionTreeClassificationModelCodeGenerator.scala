@@ -60,7 +60,7 @@ object DecisionTreeClassificationModelCodeGenerator {
       "java.util.Arrays",
       "java.util.HashSet"
     ))
-
+/*
     // Compile the code
     evaluator.cook(s"${generatedClassName}.java", generatedSourceCode)
     
@@ -68,7 +68,7 @@ object DecisionTreeClassificationModelCodeGenerator {
   
     def timeMs: Double = (endTime - startTime).toDouble / 1000000
     System.out.println(s"Compiled Java code (${generatedSourceCode.size} bytes) in $timeMs ms")
-
+*/
     // Return the generated class file
     evaluator.getClazz()
   }

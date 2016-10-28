@@ -395,7 +395,7 @@ object CodeGenerator {
           
     try {
     	val stringReader = new java.io.StringReader(codeGenBundle.body)
-      evaluator.cook(stringReader)
+      //evaluator.cook(stringReader)
       recordCompilationStats(evaluator)        
     } catch {
       case e: Exception =>

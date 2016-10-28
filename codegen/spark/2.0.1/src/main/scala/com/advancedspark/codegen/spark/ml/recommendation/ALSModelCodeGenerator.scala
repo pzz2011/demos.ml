@@ -66,7 +66,7 @@ object ALSModelClassGenerator {
     ))
 
     // Compile the code
-    evaluator.cook(s"${generatedClassName}.java", generatedSourceCode)
+//    evaluator.cook(s"${generatedClassName}.java", generatedSourceCode)
     
     val endTime = System.nanoTime()
   

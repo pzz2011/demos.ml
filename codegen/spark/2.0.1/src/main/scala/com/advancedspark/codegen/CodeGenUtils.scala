@@ -210,8 +210,10 @@ class CodeFormatter {
   /**
    * Dumps the bytecode from a class to the screen using javap.
    */
-  object DumpByteCode {
-    import scala.sys.process._
+
+object DumpByteCode {
+  /*
+  import scala.sys.process._
     val dumpDirectory = createDirectory(System.getProperty("java.io.tmpdir"))
     dumpDirectory.mkdir()
 
@@ -238,7 +240,8 @@ class CodeFormatter {
       println(
         s"javap -p -v -classpath ${dumpDirectory.getCanonicalPath} ${generatedClass.getName}".!!)
       // scalastyle:on println
-    }
+    }    
+    */
  
     /**
      * Create a directory inside the given parent directory. The directory is guaranteed to be
