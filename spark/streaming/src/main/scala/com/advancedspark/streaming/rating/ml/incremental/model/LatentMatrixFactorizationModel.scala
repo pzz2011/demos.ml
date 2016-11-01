@@ -6,14 +6,11 @@ package com.advancedspark.streaming.rating.ml.incremental.model
 // Thanks, Burak!
 //////////////////////////////////////////////////////////////////////
 
-import edu.berkeley.cs.amplab.spark.indexedrdd.IndexedRDD
-import edu.berkeley.cs.amplab.spark.indexedrdd.IndexedRDD._
-
-import org.apache.spark.Logging
 import org.apache.spark.ml.recommendation.ALS.Rating
 import org.apache.spark.rdd.RDD
 import org.apache.spark.ml.Model
 import org.apache.spark.ml.util.MLWritable
+import edu.berkeley.cs.amplab.spark.indexedrdd.IndexedRDD
 
 class LatentMatrixFactorizationModel(
     val rank: Int,

@@ -25,9 +25,11 @@ import org.json4s._
 import org.json4s.jackson.JsonMethods._
 import org.json4s.JsonDSL._
 
-import org.apache.spark.{Logging, SparkContext}
+import org.apache.spark.SparkContext
 import org.apache.spark.ml.param.{ParamPair, Params}
 import org.apache.spark.sql.SQLContext
+
+
 //import org.apache.spark.util.Utils
 
 /**
@@ -61,7 +63,7 @@ sealed trait BaseReadWrite {
 /**
  * Abstract class for utility classes that can save ML instances.
  */
-abstract class MLWriter extends BaseReadWrite with Logging {
+abstract class MLWriter extends BaseReadWrite {
 
   protected var shouldOverwrite: Boolean = false
 
@@ -76,7 +78,7 @@ abstract class MLWriter extends BaseReadWrite with Logging {
     val qualifiedOutputPath = outputPath.makeQualified(fs.getUri, fs.getWorkingDirectory)
     if (fs.exists(qualifiedOutputPath)) {
       if (shouldOverwrite) {
-        logInfo(s"Path $path already exists. It will be overwritten.")
+        //logInfo(s"Path $path already exists. It will be overwritten.")
         // TODO: Revert back to the original content if save is not successful.
         fs.delete(qualifiedOutputPath, true)
       } else {

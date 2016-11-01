@@ -1,37 +1,25 @@
 package com.advancedspark.streaming.rating.ml.incremental
 
-//////////////////////////////////////////////////////////////////////
-// This code has been adapted from the following source:
-//   https://github.com/brkyvz/streaming-matrix-factorization
-// Thanks, Burak!
-//////////////////////////////////////////////////////////////////////
-
 import java.io.PrintWriter
 
-import org.apache.spark.{SparkContext, Logging}
+import scala.reflect.ClassTag
+
+import org.apache.hadoop.fs.Path
+import org.apache.spark.SparkContext
 import org.apache.spark.api.java.JavaRDD
 import org.apache.spark.ml.recommendation.ALS.Rating
 import org.apache.spark.rdd.RDD
 import org.apache.spark.streaming.api.java.JavaDStream
 import org.apache.spark.streaming.dstream.DStream
+import org.json4s.JsonDSL._
 
-import org.apache.hadoop.fs.{FileSystem, Path}
+import com.advancedspark.streaming.rating.ml.incremental.model.LatentFactor
+import com.advancedspark.streaming.rating.ml.incremental.model.LatentMatrixFactorizationModel
+import com.advancedspark.streaming.rating.ml.incremental.model.LatentMatrixFactorizationModelOps
+import com.advancedspark.streaming.rating.ml.incremental.optimization.MFGradientDescent
 
 import edu.berkeley.cs.amplab.spark.indexedrdd.IndexedRDD
 import edu.berkeley.cs.amplab.spark.indexedrdd.IndexedRDD._
-
-import scala.reflect.ClassTag
-
-import org.json4s.DefaultFormats
-import org.json4s.JsonDSL._
-
-import com.advancedspark.streaming.rating.ml.incremental.optimization.MFGradientDescent
-import com.advancedspark.streaming.rating.ml.incremental.model.LatentMatrixFactorizationModel
-import com.advancedspark.streaming.rating.ml.incremental.model.LatentMatrixFactorizationModelOps
-import com.advancedspark.streaming.rating.ml.incremental.model.LatentFactorGenerator
-import com.advancedspark.streaming.rating.ml.incremental.model.LatentFactor
-
-import com.advancedspark.streaming.rating.ml.incremental.utils.DefaultParamsWriter
 
 /**
  * This library contains methods to train a Matrix Factorization Recommendation System on Spark. 
@@ -49,7 +37,7 @@ import com.advancedspark.streaming.rating.ml.incremental.utils.DefaultParamsWrit
  *
  * @param params Parameters for training
  */
-class LatentMatrixFactorization (params: LatentMatrixFactorizationParams) extends Logging {
+class LatentMatrixFactorization (params: LatentMatrixFactorizationParams) {
 
   def this() = this(new LatentMatrixFactorizationParams)
 
