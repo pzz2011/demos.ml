@@ -31,11 +31,13 @@ import org.apache.spark.streaming.Time
 import org.apache.spark.streaming.Minutes
 import org.apache.spark.sql._
 import org.apache.spark.sql.types._
+import shaded.parquet.org.codehaus.jackson.map.deser.StdDeserializer.StringDeserializer
+import org.apache.kafka.clients.consumer.ConsumerRecord
 
 object ElasticSearch {
   def main(args: Array[String]) {
     val conf = new SparkConf()
-    val session = SparkSession.builder().getOrCreate(conf)
+    val session = SparkSession.builder().config(conf).getOrCreate()
 
     def createStreamingContext(): StreamingContext = {
       @transient val newSsc = new StreamingContext(session.sparkContext, Seconds(2))
@@ -65,11 +67,11 @@ object ElasticSearch {
     val esConfig = Map("pushdown" -> "true", "es.nodes" -> "127.0.0.1", "es.port" -> "9200")
 
     ratingsStream.foreachRDD {
-      (message: RDD[(String, String)], batchTime: Time) => {
+      (message: RDD[ConsumerRecord[String, String]], batchTime: Time) => {
         message.cache()
 
         // Split each _2 element of the RDD (String,String) tuple into a RDD[Seq[String]]
-        val tokens = message.map(_._2.split(","))
+        val tokens = message.map(_.value().split(","))
 
         // convert Tokens into RDD[Ratings]
         val ratings = tokens.map(token =>
@@ -77,6 +79,7 @@ object ElasticSearch {
         )
 
         // save the DataFrame to ElasticSearch
+        import session.sqlContext.implicits._
         val ratingsDF = ratings.toDF("userId", "itemId", "rating", "timestamp", "geocity")
 
 	ratingsDF.write.format("org.elasticsearch.spark.sql")

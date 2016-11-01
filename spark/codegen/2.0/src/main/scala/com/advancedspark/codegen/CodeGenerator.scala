@@ -34,6 +34,7 @@ import org.codehaus.janino.util.ClassFile
 
 import com.google.common.cache.CacheBuilder
 import com.google.common.cache.CacheLoader
+import scala.collection.immutable.HashMap
 
 
 object CodeGenTypes {
@@ -57,7 +58,7 @@ object CodeGenTypes {
 class CodeGenContext {
   import CodeGenTypes._
 
-  /**
+ /**
    * Holding a list of objects that could be used passed into generated class.
    */
   val references: mutable.ArrayBuffer[Any] = new mutable.ArrayBuffer[Any]()
@@ -74,7 +75,7 @@ class CodeGenContext {
     val clsName = Option(className).getOrElse(obj.getClass.getName)
     addMutableState(clsName, term, s"this.$term = ($clsName) references[$idx];")
     term
-  }
+  }  
 
   /**
    * Holding  mutable states like `MonotonicallyIncreasingID.count` as a
@@ -99,17 +100,13 @@ class CodeGenContext {
   }
 
   def declareMutableStates(): String = {
-    // It's possible that we add same mutable state twice. 
-    // Call `distinct` here to remove the duplicated ones.
     mutableStates.distinct.map { case (javaType, variableName, _) =>
       s"private $javaType $variableName;"
     }.mkString("\n")
   }
 
   def initMutableStates(): String = {
-    // It's possible that we add same mutable state twice. 
-    // Call `distinct` here to remove the duplicated ones.
-    mutableStates.distinct.map(_._3).mkString("\n")
+    mutableStates.map(_._3).mkString("\n")
   }
 
   /**
@@ -125,6 +122,11 @@ class CodeGenContext {
   def declareAddedFunctions(): String = {
     addedFunctions.map { case (funcName, funcCode) => funcCode }.mkString("\n")
   }
+
+  /**
+   * The map from a place holder to a corresponding comment
+   */
+  private val placeHolderToComments = new mutable.HashMap[String, String]
   
   /**
    * The map from a variable name to it's next ID.
@@ -315,7 +317,7 @@ class CodeGenContext {
 /**
  * A wrapper for the source code to be compiled by [[CodeGenerator]].
  */
-class CodeGenBundle(val className: String,  
+class CodeGenBundle(val fullyQualifiedClassName: String,                     
                     val extend: Class[_],
                     val interfaces: Array[Class[_]],                  
                     val imports: Array[Class[_]],                    
@@ -324,11 +326,11 @@ class CodeGenBundle(val className: String,
 
   // TODO:  Make equals() and hashCode() more robust - used by Google Cache
   override def equals(that: Any): Boolean = that match {
-    case t: CodeGenBundle if (t.className == className && t.body == body) => true
+    case t: CodeGenBundle if (t.fullyQualifiedClassName == fullyQualifiedClassName && t.body == body) => true
     case _ => false
   }
 
-  override def hashCode(): Int = (className + body).hashCode
+  override def hashCode(): Int = (fullyQualifiedClassName + body).hashCode
 }
 
 object CodeGenerator {
@@ -346,11 +348,11 @@ object CodeGenerator {
   private[this] def doCompile(codeGenBundle: CodeGenBundle): Class[_] = {
     val evaluator = new ClassBodyEvaluator()
 
-    evaluator.setClassName(codeGenBundle.className)
+    evaluator.setClassName(codeGenBundle.fullyQualifiedClassName)
     evaluator.setDefaultImports(codeGenBundle.imports.map(_.getName))
     evaluator.setImplementedInterfaces(codeGenBundle.interfaces) 
     
-    val parentClassLoader = evaluator.setParentClassLoader(getClass.getClassLoader)
+    val parentClassLoader = evaluator.setParentClassLoader(getClass.getClassLoader)      
     
     lazy val formatted = CodeFormatter.format(codeGenBundle)
 
@@ -360,7 +362,7 @@ object CodeGenerator {
           
     try {
     	val stringReader = new java.io.StringReader(codeGenBundle.body)
-      //evaluator.cook(stringReader)
+      evaluator.cook(stringReader)
       recordCompilationStats(evaluator)        
     } catch {
       case e: Exception =>

@@ -23,11 +23,12 @@ import org.apache.spark.sql.types._
 import com.twitter.algebird.TopPctCMS
 import com.twitter.algebird.CMSHasherImplicits._
 import com.madhukaraphatak.sizeof.SizeEstimator
+import org.apache.kafka.common.serialization.StringDeserializer
 
 object AlgebirdCountMinSketchTopK {
   def main(args: Array[String]) {
     val conf = new SparkConf()
-    val session = SparkSession.builder().getOrCreate(conf)
+    val session = SparkSession.builder().config(conf).getOrCreate()
 
     def createStreamingContext(): StreamingContext = {
       @transient val newSsc = new StreamingContext(session.sparkContext, Seconds(2))
@@ -73,7 +74,7 @@ object AlgebirdCountMinSketchTopK {
     //   (userId, itemId, rating)
     val counts = ratingsStream.mapPartitions(messages => {
       messages.map(message => {
-	val itemId = message._2.split(",")(1).trim.toInt
+	val itemId = message.value().split(",")(1).trim.toInt
 	topKCms.create(itemId)
       })
     }).reduce(_ ++ _)
@@ -87,9 +88,10 @@ object AlgebirdCountMinSketchTopK {
         val globalTopK = globalTopKCms.heavyHitters.map(itemId => 
           (itemId, globalTopKCms.frequency(itemId).estimate)).toSeq.sortBy(_._2).reverse.slice(0, TopK)
       
-        val globalTopKDF = sc.parallelize(globalTopK).toDF("itemId", "approxCount")
+        import session.sqlContext.implicits._
+        val globalTopKDF = session.sparkContext.parallelize(globalTopK).toDF("itemId", "approxCount")
 
-	val enrichedTopK =
+	      val enrichedTopK =
           globalTopKDF.join(itemsDF, $"itemId" === $"id")
             .select($"itemId", $"approxCount", $"title")
             .sort($"approxCount" desc)

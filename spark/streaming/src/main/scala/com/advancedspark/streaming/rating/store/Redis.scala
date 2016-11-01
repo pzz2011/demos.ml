@@ -32,12 +32,14 @@ import org.apache.spark.streaming.Time
 import org.apache.spark.streaming.Minutes
 import org.apache.spark.sql._
 import org.apache.spark.sql.types._
+import org.apache.kafka.common.serialization.StringDeserializer
+import org.apache.kafka.clients.consumer.ConsumerRecord
 
 object Redis {
   def main(args: Array[String]) {
 
     val conf = new SparkConf()
-    val session = SparkSession.builder().getOrCreate(conf)
+    val session = SparkSession.builder().config(conf).getOrCreate()
 
     def createStreamingContext(): StreamingContext = {
       @transient val newSsc = new StreamingContext(session.sparkContext, Seconds(2))
@@ -65,11 +67,11 @@ object Redis {
     )
 
     ratingsStream.foreachRDD {
-      (message: RDD[(String, String)], batchTime: Time) => {
+      (message: RDD[ConsumerRecord[String, String]], batchTime: Time) => {
         message.cache()
 
         // Split each _2 element of the RDD (String,String) tuple into a RDD[Seq[String]]
-        val tokens = message.map(_._2.split(","))
+        val tokens = message.map(_.value().split(","))
 
         // convert Tokens into RDD[Ratings]
         val ratings = tokens.map(token =>
@@ -82,7 +84,7 @@ object Redis {
           //        1) This obviously only works when everything is running on 1 node.
           //        2) This should be using a Jedis Singleton/Pooled connection
           //        3) Explore the spark-redis package (RedisLabs:spark-redis:0.1.0+)
-          val jedis = new Jedis("redis.datasticks.com", 6379)
+          val jedis = new Jedis("redis-master", 6379)
           val t = jedis.multi()
           ratingsPartitionIter.foreach(rating => {
             val keyExactRatingCount = s"""exact-rating-count:${rating.itemId}"""

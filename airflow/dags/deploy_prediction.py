@@ -22,10 +22,10 @@ default_args = {
     # 'end_date': datetime(2016, 4, 24),
 }
 
-dag = DAG('spark_pi', default_args=default_args)
+dag = DAG('deploy_prediction', default_args=default_args)
 
 # t1 is an example of tasks created by instatiating operators
 t1 = BashOperator(
-    task_id='spark_pi',
-    bash_command='spark-submit --class org.apache.spark.examples.SparkPi --master local[*] $SPARK_HOME/examples/jars/spark-examples_2.11-2.0.1-SNAPSHOT.jar 10',
+    task_id='deploy_prediction',
+    bash_command='kubectl create -f prediction-rc.yaml',
     dag=dag)

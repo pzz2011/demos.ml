@@ -15,8 +15,10 @@ import com.maxmind.geoip2.DatabaseReader
 import com.maxmind.db.CHMCache
 import java.net.InetAddress
 import java.io.File
+
 import scala.collection.JavaConversions._
 
+import org.apache.kafka.common.serialization.StringSerializer
 import org.apache.spark.streaming.kafka010._
 import org.apache.spark.streaming.kafka010.LocationStrategies.PreferConsistent
 import org.apache.spark.streaming.kafka010.ConsumerStrategies.Subscribe
@@ -35,14 +37,16 @@ import org.apache.spark.streaming.Time
 import org.apache.spark.streaming.Minutes
 import org.apache.spark.sql._
 import org.apache.spark.sql.types._
+import org.apache.kafka.common.serialization.StringDeserializer
+import org.apache.kafka.clients.consumer.ConsumerRecord
 
 object KafkaCassandra {
   def main(args: Array[String]) {
     val conf = new SparkConf()
       .set("spark.cassandra.connection.host", "cassandra.datasticks.com")
 
-    val conf = new SparkConf()
-    val session = SparkSession.builder().getOrCreate(conf)
+    val session = SparkSession.builder().config(conf).getOrCreate()
+    import session.sqlContext.implicits._
 
     def createStreamingContext(): StreamingContext = {
       @transient val newSsc = new StreamingContext(session.sparkContext, Seconds(2))
@@ -77,7 +81,7 @@ object KafkaCassandra {
     ratingsStream.print()
 
     ratingsStream.foreachRDD {
-      (messages: RDD[(String, String)], batchTime: Time) => {
+      (messages: RDD[ConsumerRecord[String, String]], batchTime: Time) => {
         // Using the foreachPartition() pattern: 
         //   http://spark.apache.org/docs/latest/streaming-programming-guide.html#performance-tuning
         // to initialize the geoIPResolver (Maxmind DB) for each partition vs. each record
@@ -91,7 +95,7 @@ object KafkaCassandra {
 
           val ratingsIterInner = partitionIter.map( message => {
             // Split each _2 element of the (String,String) message tuple into Seq[String]
-            val tokens = message._2.split(",")
+            val tokens = message.value().split(",")
 
             // Resolve City from hostname (if provided)
             val geocity =

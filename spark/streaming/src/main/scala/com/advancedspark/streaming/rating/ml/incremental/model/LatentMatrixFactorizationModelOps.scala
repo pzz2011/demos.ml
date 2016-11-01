@@ -1,16 +1,17 @@
 package com.advancedspark.streaming.rating.ml.incremental.model
 
-import edu.berkeley.cs.amplab.spark.indexedrdd.IndexedRDD
-import edu.berkeley.cs.amplab.spark.indexedrdd.IndexedRDD._
-
-import org.apache.spark.Logging
 import org.apache.spark.ml.recommendation.ALS.Rating
 import org.apache.spark.rdd.RDD
-import com.advancedspark.streaming.rating.ml.incremental.utils.VectorUtils
+import org.apache.spark.rdd.RDD.rddToPairRDDFunctions
+
 import com.advancedspark.streaming.rating.ml.incremental.LatentMatrixFactorizationParams
+import com.advancedspark.streaming.rating.ml.incremental.utils.VectorUtils
+
+import edu.berkeley.cs.amplab.spark.indexedrdd.IndexedRDD
+import edu.berkeley.cs.amplab.spark.indexedrdd.IndexedRDD.longSer
 
 // TODO:  Figure out why this is a separate class 
-object LatentMatrixFactorizationModelOps extends Serializable with Logging {
+object LatentMatrixFactorizationModelOps extends Serializable {
 
   /**
    * Adds random factors for missing user - item entries and updates the global bias and
@@ -100,16 +101,16 @@ object LatentMatrixFactorizationModelOps extends Serializable with Logging {
         Rating(userId, itemId, LatentMatrixFactorizationModelOps.getRating(userFactors.get, itemFactors.get,
           globalBias, minRating, maxRating))
       } else if (userFactors.isDefined) {
-        logWarning(s"Item data missing for item id $itemId. Will use user factors.")
+        //logWarning(s"Item data missing for item id $itemId. Will use user factors.")
         val rating = globalBias + userFactors.get.bias
         Rating(userId, itemId, math.min(maxRating, math.max(minRating, rating)))
       } else if (itemFactors.isDefined) {
-        logWarning(s"User data missing for user id $userId. Will use item factors.")
+        //logWarning(s"User data missing for user id $userId. Will use item factors.")
         val rating = globalBias + itemFactors.get.bias
         Rating(userId, itemId, math.min(maxRating, math.max(minRating, rating)))
       } else {
-        logWarning(s"Both user and item factors missing for ($userId, $itemId). " +
-          "Returning global average.")
+        //logWarning(s"Both user and item factors missing for ($userId, $itemId). " +
+        //  "Returning global average.")
         val rating = globalBias
         Rating(userId, itemId, math.min(maxRating, math.max(minRating, rating)))
       }

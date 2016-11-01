@@ -36,11 +36,12 @@ import org.apache.spark.streaming.Time
 import org.apache.spark.streaming.Minutes
 import org.apache.spark.sql._
 import org.apache.spark.sql.types._
+import org.apache.kafka.common.serialization.StringDeserializer
 
 object AlgebirdHyperLogLog {
   def main(args: Array[String]) {
     val conf = new SparkConf()
-    val session = SparkSession.builder().getOrCreate(conf)
+    val session = SparkSession.builder().config(conf).getOrCreate()
 
     def createStreamingContext(): StreamingContext = {
       @transient val newSsc = new StreamingContext(session.sparkContext, Seconds(2))
@@ -92,7 +93,7 @@ object AlgebirdHyperLogLog {
 
     // Create (key, value) pairs which is what updateStateByKey expects
     val itemIdHllStream = ratingsStream.map(message => {
-      val tokens = message._2.split(",")
+      val tokens = message.value().split(",")
       val userId = tokens(0).trim.toInt
       val itemId = tokens(1).trim.toInt
       val userIdHll = hllMonoid.create(userId)
@@ -116,6 +117,7 @@ object AlgebirdHyperLogLog {
     val sumItemIdApproxDistrinctCountRowStream = sumItemIdApproxDistinctCountStream.map(rdd => (rdd._1, rdd._2))
 
     sumItemIdApproxDistrinctCountRowStream.foreachRDD(rdd => {
+      import session.sqlContext.implicits._
       val sumItemIdApproxDistinctCountRowsDF = rdd.toDF("itemId", "approxDistinctCount")
 
       val enrichedDF =
