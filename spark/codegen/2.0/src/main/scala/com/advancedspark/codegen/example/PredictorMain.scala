@@ -9,6 +9,11 @@ import com.advancedspark.codegen.DumpByteCode
 import com.advancedspark.codegen.Predictable
 import com.advancedspark.codegen.Initializable
 
+import org.apache.http.client.methods.HttpPost
+import org.apache.http.entity.StringEntity
+import org.apache.http.entity.ByteArrayEntity
+import org.apache.http.impl.client.DefaultHttpClient
+
 object PredictorMain {
   def main(args: Array[String]) {   
     val ctx = new CodeGenContext()
@@ -68,6 +73,26 @@ object PredictorMain {
       val bar2 = clazz2.newInstance().asInstanceOf[Initializable]
       bar2.initialize(references)
       System.out.println(s"Predict 'b' -> '${bar2.asInstanceOf[Predictable].predict("b")}'")
+
+      // create an HttpPost object
+      println("--- HTTP POST UPDATE JAVA CLASS ---")
+      val post = new HttpPost(s"http://prediction.demo.datasticks.com/update-lookup/com.advancedspark.codegen.example.generated.Predictor")
+
+      // set the Content-type
+      post.setHeader("Content-type", "text/plain")
+
+      // add the byte[] as a ByteArrayEntity
+      post.setEntity(new StringEntity(cleanedSource.body))
+
+      // send the post request
+      val response = (new DefaultHttpClient).execute(post)
+
+      // print the response status and headers
+      println("--- HTTP RESPONSE STATUS ---")
+      println(response.getStatusLine)
+
+      println("--- HTTP RESPONSE HEADERS ---")
+      response.getAllHeaders.foreach(arg => println(arg))
     } catch {
       case e: Exception =>
         System.out.println(s"Could not generate code: ${cleanedSource}", e)
